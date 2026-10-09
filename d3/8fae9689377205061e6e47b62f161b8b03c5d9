@@ -1,0 +1,32 @@
+tests/test_keep_audio_ui.py
+  s_75d7293523bbdb::t_ac6e52813cfa02 181,184-185
+  s_75d7293523bbdb::t_412fdfbe882ac9 160-180,182-183,186-187
+tests/test_pending.py
+  s_75d7293523bbdb::t_91296fa58113d0 3
+  s_75d7293523bbdb::t_2c545e7a23e748 178-205
+tests/test_paste.py
+  s_75d7293523bbdb::t_ed4852ca35c87a 18,22
+  s_75d7293523bbdb::t_a34af4fd849287 140-162
+  s_75d7293523bbdb::t_bee6f55267698f 52-53
+gui.py
+  s_75d7293523bbdb::t_75918030579663 684,691-694
+core.py
+  s_75d7293523bbdb::t_dbae0582a090a5 230-233
+  s_75d7293523bbdb::t_004ddf9345eb5e 331-334
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d38fae9689377205061e6e47b62f161b8b03c5d9",
+  "prompts": {},
+  "sessions": {
+    "s_75d7293523bbdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7833327-04a7-49da-90ef-76796eaf3993",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Darko Palic <darko.palic@xenovation.com>"
+    }
+  }
+}
