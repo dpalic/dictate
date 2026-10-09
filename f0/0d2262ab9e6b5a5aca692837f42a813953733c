@@ -1,0 +1,35 @@
+gui.py
+  s_75d7293523bbdb::t_99b3072f5ad3d0 13-16
+  s_75d7293523bbdb::t_b42cb4aa2f3fd8 685,690,694-698
+  s_75d7293523bbdb::t_28d8ac221c19ce 699
+  s_75d7293523bbdb::t_81d31e6c67330c 408-433
+README.md
+  s_75d7293523bbdb::t_c2f39db49e97e3 141-142,146
+  s_75d7293523bbdb::t_3f5c4743e9c646 54-61
+core.py
+  s_75d7293523bbdb::t_639af3ab8e5f48 6-8,11
+  s_75d7293523bbdb::t_a4038c067b824c 131
+  s_75d7293523bbdb::t_bbaf96f6d8fdbd 235-358
+tests/test_keep_audio_ui.py
+  s_75d7293523bbdb::t_2afaa0203dfbca 240-280
+  s_75d7293523bbdb::t_a6639056f5b6c9 55-58,60,63-64
+  s_75d7293523bbdb::t_581bd6809e0309 167
+tests/test_paste.py
+  s_75d7293523bbdb::t_951aa459bb7478 1-281
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f00d2262ab9e6b5a5aca692837f42a813953733c",
+  "prompts": {},
+  "sessions": {
+    "s_75d7293523bbdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7833327-04a7-49da-90ef-76796eaf3993",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Darko Palic <darko.palic@xenovation.com>"
+    }
+  }
+}
