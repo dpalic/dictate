@@ -1,5 +1,6 @@
 """Saved recordings: written before transcribing, deleted only on success, kept tidy."""
 import os
+import subprocess
 import time
 from types import SimpleNamespace
 
@@ -172,6 +173,34 @@ def test_typing_fails_when_no_tool_is_installed(monkeypatch, typing):
 
     assert core.type_text("hallo") is False
     assert typing and "neither xdotool nor ydotool" in typing[0]
+
+
+@pytest.mark.parametrize("error", [
+    PermissionError("xdotool is not executable"),
+    OSError("exec format error"),
+    subprocess.SubprocessError("tool crashed"),
+    subprocess.TimeoutExpired("xdotool", 5),
+])
+def test_typing_that_raises_is_reported_and_returns_false(monkeypatch, typing, error):
+    def broken(cmd, **kwargs):
+        raise error
+
+    monkeypatch.setattr(core.subprocess, "run", broken)
+
+    assert core.type_text("hallo") is False                # no exception escapes
+    assert typing and "Typing failed" in typing[0]
+
+
+def test_an_error_in_the_second_tool_is_reported_after_the_first_was_missing(monkeypatch, typing):
+    def run(cmd, **kwargs):
+        if cmd[0] == "xdotool":
+            raise FileNotFoundError("xdotool")
+        raise PermissionError("ydotool: /dev/uinput")
+
+    monkeypatch.setattr(core.subprocess, "run", run)
+
+    assert core.type_text("hallo") is False
+    assert typing and "ydotool" in typing[0]
 
 
 def test_typing_falls_back_to_the_second_tool(monkeypatch, typing):

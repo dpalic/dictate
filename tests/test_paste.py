@@ -15,10 +15,11 @@ class FakeX:
     """Stands in for xdotool, xprop and the clipboard tool, and records what happens."""
 
     def __init__(self, monkeypatch, window=TERMINAL, clipboard=b"old text", key_rc=0,
-                 tools=("xsel", "xdotool", "xprop"), write_fails=False):
+                 tools=("xsel", "xdotool", "xprop"), write_fails=False, key_raises=None):
         self.clipboard = clipboard           # None: empty or not text
         self.window = window
         self.key_rc = key_rc
+        self.key_raises = key_raises         # exception the key press raises, e.g. TimeoutExpired
         self.write_fails = write_fails
         self.events = []
         monkeypatch.setenv("XDG_SESSION_TYPE", "x11")
@@ -48,6 +49,8 @@ class FakeX:
             return SimpleNamespace(returncode=0)
         if name == "xdotool" and cmd[1] == "key":
             self.events.append(("key", cmd[-1]))
+            if self.key_raises:
+                raise self.key_raises
             return SimpleNamespace(returncode=self.key_rc)
         raise AssertionError(f"unexpected command {cmd}")
 
@@ -132,6 +135,29 @@ def test_a_failed_key_press_returns_false_and_still_restores_the_clipboard(monke
 
     assert x.clipboard == b"old text"
     assert x.notes and "Pasting failed" in x.notes[0]
+
+
+@pytest.mark.parametrize("error", [
+    subprocess.TimeoutExpired("xdotool", 5),
+    PermissionError("xdotool is not executable"),
+    subprocess.SubprocessError("tool crashed"),
+])
+def test_a_key_press_that_raises_is_reported_and_the_clipboard_is_still_restored(monkeypatch, error):
+    x = FakeX(monkeypatch, key_raises=error)
+
+    assert core.paste_text("hallo") is False                # no exception escapes
+
+    assert x.clipboard == b"old text"
+    assert x.notes and "Pasting failed" in x.notes[0]
+
+
+def test_a_raising_key_press_is_logged(monkeypatch, caplog):
+    FakeX(monkeypatch, key_raises=subprocess.TimeoutExpired("xdotool", 5))
+
+    with caplog.at_level("ERROR", logger="dictate"):
+        core.paste_text("hallo")
+
+    assert "paste key press failed" in caplog.text
 
 
 def test_empty_text_needs_no_clipboard_and_counts_as_done(monkeypatch):

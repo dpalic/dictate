@@ -681,13 +681,17 @@ class MainWindow(QMainWindow):
     def _type_and_confirm(self, text, path):
         """Type the text; only when that worked is the saved recording deleted."""
         saved = Path(path) if path else None
+        kept = "Recording kept, press Retry. " if saved else ""
         try:
             if core.output_text(text, self.cfg.get("output_method", "paste")):
                 if saved:
                     core.discard_pending(saved)
             else:
-                kept = "Recording kept, press Retry. " if saved else ""
                 self.bridge.error.emit(f"{kept}Inserting the text failed")
+        except Exception as e:
+            # Whatever went wrong, the user must hear about it; the recording stays on disk.
+            core.log.exception("inserting the text failed")
+            self.bridge.error.emit(f"{kept}Inserting the text failed: {e}")
         finally:
             self._finish_attempt(saved)
 

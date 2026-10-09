@@ -157,6 +157,34 @@ def test_silence_is_not_saved_and_not_offered(app):
     assert app.window.retry_btn.isHidden()
 
 
+def test_an_exception_in_the_output_step_is_reported_and_keeps_the_recording(app, monkeypatch):
+    def explode(text, method="paste"):
+        raise RuntimeError("clipboard tool vanished")
+
+    monkeypatch.setattr(core, "output_text", explode)
+
+    dictate(app)
+
+    assert len(app.errors) == 1
+    assert "Recording kept, press Retry" in app.errors[0] and "clipboard tool vanished" in app.errors[0]
+    assert len(core.list_pending()) == 1
+    assert len(app.window.pending_files()) == 1            # no longer "in progress": Retry is offered
+    assert not app.window.retry_btn.isHidden()
+
+
+def test_an_exception_for_an_unsaved_recording_is_reported_without_the_retry_hint(app, monkeypatch):
+    def explode(text, method="paste"):
+        raise RuntimeError("clipboard tool vanished")
+
+    monkeypatch.setattr(core, "output_text", explode)
+
+    dictate(app, QUIET)                    # too quiet to be saved, yet the fake transcriber returns text
+
+    assert core.list_pending() == []
+    assert len(app.errors) == 1
+    assert "Recording kept" not in app.errors[0] and "clipboard tool vanished" in app.errors[0]
+
+
 def test_a_typing_failure_keeps_the_recording(app):
     app.type_ok = False
 

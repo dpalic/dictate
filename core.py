@@ -227,6 +227,10 @@ def type_text(text):
             return True
         except FileNotFoundError:
             continue
+        except (OSError, subprocess.SubprocessError) as e:
+            log.error("%s failed: %s — text not typed", tool, e)
+            notify(f"Typing failed ({tool}: {e})", urgency="critical", timeout_ms=5000)
+            return False
     log.error("no typing tool found (xdotool, ydotool) — text not typed")
     notify("Typing failed: neither xdotool nor ydotool is installed", urgency="critical", timeout_ms=5000)
     return False
@@ -324,6 +328,10 @@ def paste_text(text):
             return False
         time.sleep(PASTE_SETTLE_S)   # the program reads the clipboard after the key press
         return True
+    except (OSError, subprocess.SubprocessError) as e:    # TimeoutExpired, tool vanished, ...
+        log.error("paste key press failed: %s", e)
+        notify(f"Pasting failed ({e})", urgency="critical", timeout_ms=5000)
+        return False
     finally:
         # Only text can be restored; if the clipboard held something else, the dictated text stays.
         if previous is not None:
