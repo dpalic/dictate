@@ -1,0 +1,21 @@
+gui.py
+  s_75d7293523bbdb::t_1c185773af768f 363-366,420,424
+tests/test_capslock_ui.py
+  s_75d7293523bbdb::t_be8bc8a15ae769 356-380
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3c53f64074e4b6bce67a621931c7da300b22d353",
+  "prompts": {},
+  "sessions": {
+    "s_75d7293523bbdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7833327-04a7-49da-90ef-76796eaf3993",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Darko Palic <darko.palic@xenovation.com>"
+    }
+  }
+}
