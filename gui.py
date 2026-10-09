@@ -121,10 +121,10 @@ class SettingsDialog(QDialog):
         self.capslock_box.setChecked(bool(self.cfg.get("disable_capslock", True)))
         if capslock.is_available():
             self.capslock_box.setToolTip(
-                "Switches the Caps Lock function off in the desktop (GNOME keyboard option\n"
-                "caps:none) while Dictate runs with direct access to the input devices\n"
-                "(group 'input'). Until it has that access, Caps Lock keeps working.\n"
-                "Uncheck it, or pick another hotkey, to get Caps Lock back."
+                "While Dictate is running, switches the Caps Lock function off in the desktop\n"
+                "(GNOME keyboard option caps:none), after turning Caps Lock itself off so it\n"
+                "cannot stay on. Only with direct access to the input devices (group 'input');\n"
+                "until then Caps Lock keeps working. Closing Dictate gives the function back."
             )
         else:
             self.capslock_box.setEnabled(False)
@@ -491,6 +491,9 @@ class MainWindow(QMainWindow):
         self.set_status("ready", "Ready")
         self.update_info()
         self.start_listener()
+        # Caps Lock gets its function back when Dictate closes (a killed process
+        # skips this; the next start repairs it).
+        QApplication.instance().aboutToQuit.connect(self._release_capslock)
         self._preload_local_if_needed()
 
         if not core.provider_key(self.cfg):
@@ -587,6 +590,16 @@ class MainWindow(QMainWindow):
             core.log.warning(message)
             core.notify(message, urgency="normal", timeout_ms=5000)
         if managed != bool(self.cfg.get("capslock_managed")):
+            self.cfg["capslock_managed"] = managed
+            core.save_config(self.cfg)
+
+    def _release_capslock(self):
+        """Give the Caps Lock function back if this app switched it off."""
+        was_managed = bool(self.cfg.get("capslock_managed"))
+        managed, message = capslock.apply(False, was_managed)
+        if message:
+            core.log.warning(message)
+        if managed != was_managed:
             self.cfg["capslock_managed"] = managed
             core.save_config(self.cfg)
 
