@@ -116,6 +116,8 @@ def make_window(gui_module, monkeypatch):
         def stop(self):
             pass
 
+    windows = []
+
     def make(key, evdev, disable=True, managed=False, result=(False, "")):
         cfg = dict(gui_module.core.DEFAULT_CONFIG, key=key, disable_capslock=disable,
                    capslock_managed=managed)
@@ -126,8 +128,19 @@ def make_window(gui_module, monkeypatch):
         monkeypatch.setattr(gui_module.capslock, "apply", rec.apply)
         monkeypatch.setattr(gui_module, "_make_listener",
                             lambda on_press, on_release: FakeEvdev() if evdev else FakePynput())
-        return gui_module.MainWindow(), rec
-    return make
+        window = gui_module.MainWindow()
+        windows.append(window)
+        return window, rec
+
+    yield make
+
+    # A window that outlives its test must not fire its quit handler against the real desktop.
+    from PyQt6.QtWidgets import QApplication
+    for window in windows:
+        try:
+            QApplication.instance().aboutToQuit.disconnect(window._release_capslock)
+        except TypeError:
+            pass
 
 
 def test_caps_lock_with_evdev_switches_the_function_off_and_remembers_it(make_window):
@@ -161,6 +174,51 @@ def test_choosing_another_hotkey_gives_caps_lock_back(make_window):
 
     assert rec.applied == [(False, True)]
     assert rec.saved[-1]["capslock_managed"] is False
+    window.close()
+
+
+def test_closing_the_app_gives_caps_lock_back(make_window):
+    window, rec = make_window("caps_lock", evdev=True, managed=True, result=(True, ""))
+    rec.applied.clear()
+    rec.result = (False, "")      # what removing the option returns
+
+    window._release_capslock()
+
+    assert rec.applied == [(False, True)]
+    assert rec.saved[-1]["capslock_managed"] is False
+    window.close()
+
+
+def test_closing_the_app_leaves_a_users_own_setting_alone(make_window):
+    window, rec = make_window("caps_lock", evdev=True, managed=False, result=(False, ""))
+    rec.applied.clear()
+    rec.saved.clear()
+
+    window._release_capslock()
+
+    assert rec.applied == [(False, False)]        # apply() itself ignores what is not ours
+    assert rec.saved == []
+    window.close()
+
+
+def test_a_failed_release_is_logged_and_ownership_is_kept(make_window, caplog):
+    window, rec = make_window("caps_lock", evdev=True, managed=True, result=(True, "no dbus"))
+    rec.saved.clear()
+
+    with caplog.at_level("WARNING", logger="dictate"):
+        window._release_capslock()
+
+    assert rec.saved == []                         # still ours, so the next start can retry
+    assert "no dbus" in caplog.text
+    window.close()
+
+
+def test_the_quit_signal_is_connected_to_the_release(gui_module, make_window, qapp):
+    before = qapp.receivers(qapp.aboutToQuit)
+
+    window, _ = make_window("f9", evdev=True)
+
+    assert qapp.receivers(qapp.aboutToQuit) == before + 1
     window.close()
 
 
