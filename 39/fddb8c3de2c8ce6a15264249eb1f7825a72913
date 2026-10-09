@@ -1,0 +1,36 @@
+gui.py
+  s_75d7293523bbdb::t_998fedf62cdbe3 440-442
+  s_75d7293523bbdb::t_4cb7b3937b2a89 542-551
+  s_75d7293523bbdb::t_bf070fdece12c8 121-124
+tests/test_capslock_ui.py
+  s_75d7293523bbdb::t_ee9bdea8a4c406 180,182,184-224
+  s_75d7293523bbdb::t_0f33ed4e5ab96d 181,183
+  s_75d7293523bbdb::t_83f2075259c3eb 119-120,131-143
+capslock.py
+  s_75d7293523bbdb::t_4ddd161b8a66fc 60,64,67-71
+  s_75d7293523bbdb::t_10918d858389c4 10-13,16-17,20
+  s_75d7293523bbdb::t_e0a862a468b678 52-59,61-63,65-66,72-99
+  s_75d7293523bbdb::t_0cc9b0032eafa2 113,127-130
+tests/test_capslock.py
+  s_75d7293523bbdb::t_656c0e8e6cedbe 204-207
+  s_75d7293523bbdb::t_0a05976c0da6c1 145-197,208-273
+  s_75d7293523bbdb::t_d26bf702fafc57 9-31
+  s_75d7293523bbdb::t_c291e352ba9022 36,40,52-53
+  s_75d7293523bbdb::t_47f87f9103b768 198-203
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "39fddb8c3de2c8ce6a15264249eb1f7825a72913",
+  "prompts": {},
+  "sessions": {
+    "s_75d7293523bbdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7833327-04a7-49da-90ef-76796eaf3993",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Darko Palic <darko.palic@xenovation.com>"
+    }
+  }
+}
