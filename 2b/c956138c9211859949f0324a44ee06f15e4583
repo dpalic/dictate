@@ -1,0 +1,27 @@
+tests/test_pending.py
+  s_75d7293523bbdb::t_cc40a459e36a26 1-189
+core.py
+  s_75d7293523bbdb::t_cc40a459e36a26 193,195,207,223-224,227-229,302-304,307-311,313-325,327-367
+tests/test_keep_audio_ui.py
+  s_75d7293523bbdb::t_cc40a459e36a26 1-270
+README.md
+  s_75d7293523bbdb::t_cc40a459e36a26 91
+gui.py
+  s_75d7293523bbdb::t_824e6952c71b60 7,24,47,49,434-436,470-474,493-495,499,508-509,725-734,737-740,746-747,753-755,757-761,763,765,769-812
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2bc956138c9211859949f0324a44ee06f15e4583",
+  "prompts": {},
+  "sessions": {
+    "s_75d7293523bbdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7833327-04a7-49da-90ef-76796eaf3993",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Darko Palic <darko.palic@xenovation.com>"
+    }
+  }
+}
