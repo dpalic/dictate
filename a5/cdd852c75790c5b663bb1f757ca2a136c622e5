@@ -1,0 +1,23 @@
+evdev_listener.py
+  s_75d7293523bbdb::t_57d42dcba5809a 13,15,97-118,134
+tests/conftest.py
+  s_75d7293523bbdb::t_2f883f2a667566 1-4
+tests/test_evdev_listener_hint.py
+  s_75d7293523bbdb::t_d55b498e538cd2 1-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a5cdd852c75790c5b663bb1f757ca2a136c622e5",
+  "prompts": {},
+  "sessions": {
+    "s_75d7293523bbdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7833327-04a7-49da-90ef-76796eaf3993",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Darko Palic <darko.palic@xenovation.com>"
+    }
+  }
+}
