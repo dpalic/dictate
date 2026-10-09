@@ -1,0 +1,19 @@
+run.sh
+  s_75d7293523bbdb::t_e915ea5a92ca61 2-9,14-15,17-19,22-35,38-65,72,79-82,87-97,99-113,115-118,120-121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "79e10fdcdf8e1c55c5658d9c740af938c86126c2",
+  "prompts": {},
+  "sessions": {
+    "s_75d7293523bbdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7833327-04a7-49da-90ef-76796eaf3993",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Darko Palic <darko.palic@xenovation.com>"
+    }
+  }
+}
