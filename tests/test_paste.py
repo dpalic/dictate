@@ -1,6 +1,8 @@
 """Pasting instead of typing, with a fake clipboard, window and key press."""
 import json
 import subprocess
+import threading
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -283,6 +285,134 @@ def test_how_long_the_output_took_is_logged(methods, caplog):
 
     assert "output via paste: 5 chars in" in caplog.text
     assert "output via type: 5 chars in" in caplog.text
+
+
+# --- one dictation at a time (real threads) ----------------------------------------------------------
+
+def run_in_threads(targets, join_timeout=5):
+    """Start each callable in its own real thread, in order; return the exceptions they raised."""
+    errors = []
+
+    def wrap(fn):
+        def run():
+            try:
+                fn()
+            except Exception as e:      # collected, so a test can look at it
+                errors.append(e)
+        return run
+
+    threads = [threading.Thread(target=wrap(fn)) for fn in targets]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(join_timeout)
+    assert not any(t.is_alive() for t in threads), "a thread is stuck: the lock was never released"
+    return errors
+
+
+@pytest.fixture
+def slow_output(monkeypatch):
+    """paste/type fakes that take a moment and record when they start and end."""
+    log = []
+
+    def make(name, result=True, boom=None, pause=0.05):
+        def fake(text):
+            log.append((name, "start", text))
+            time.sleep(pause)
+            try:
+                if boom:
+                    raise boom
+                return result
+            finally:
+                log.append((name, "end", text))
+        return fake
+
+    monkeypatch.setattr(core, "paste_text", make("paste"))
+    monkeypatch.setattr(core, "type_text", make("type"))
+    monkeypatch.setattr(core, "notify", lambda *a, **k: None)
+    return SimpleNamespace(log=log, make=make)
+
+
+def test_two_dictations_at_once_are_inserted_one_after_the_other(slow_output):
+    errors = run_in_threads([lambda: core.output_text("eins", "paste"),
+                             lambda: core.output_text("zwei", "type")])
+
+    assert errors == []
+    states = [state for _, state, _ in slow_output.log]
+    assert states == ["start", "end", "start", "end"]            # never start, start, end, end
+    assert sorted(text for _, state, text in slow_output.log if state == "start") == ["eins", "zwei"]
+
+
+def test_many_dictations_never_overlap(slow_output):
+    errors = run_in_threads([lambda i=i: core.output_text(f"text {i}", "paste") for i in range(6)])
+
+    assert errors == []
+    states = [state for _, state, _ in slow_output.log]
+    assert states == ["start", "end"] * 6
+
+
+def test_dictations_are_inserted_in_the_order_they_arrived(slow_output, monkeypatch):
+    first_may_end = threading.Event()
+    inserted = []
+
+    def paste(text):
+        inserted.append(text)
+        if text == "text 0":
+            assert first_may_end.wait(5)
+        return True
+
+    monkeypatch.setattr(core, "paste_text", paste)
+    threads = []
+
+    def call(i):
+        core.output_text(f"text {i}", "paste")
+
+    for i in range(5):
+        t = threading.Thread(target=call, args=(i,))
+        t.start()
+        threads.append(t)
+        # wait until this caller has taken its ticket, so the arrival order is certain
+        deadline = time.monotonic() + 5
+        while core._output_lock._next_ticket < i + 1 and time.monotonic() < deadline:
+            time.sleep(0.001)
+    first_may_end.set()
+    for t in threads:
+        t.join(5)
+
+    assert inserted == [f"text {i}" for i in range(5)]
+
+
+def test_a_failing_dictation_does_not_block_the_next_one(slow_output, monkeypatch):
+    monkeypatch.setattr(core, "paste_text", slow_output.make("paste", boom=RuntimeError("clipboard exploded")))
+
+    errors = run_in_threads([lambda: core.output_text("kaputt", "paste")])
+    monkeypatch.setattr(core, "paste_text", slow_output.make("paste"))
+    second = run_in_threads([lambda: core.output_text("danach", "paste")])
+
+    assert [str(e) for e in errors] == ["clipboard exploded"]
+    assert second == []
+    assert core.output_text("und noch einmal", "paste") is True      # also from the calling thread
+
+
+def test_a_failed_paste_result_releases_the_lock_too(slow_output, monkeypatch):
+    monkeypatch.setattr(core, "paste_text", slow_output.make("paste", result=False))
+
+    assert core.output_text("a", "paste") is False
+    assert core.output_text("b", "paste") is False
+
+
+def test_overlapping_real_pastes_keep_the_clipboard_sequence_intact(monkeypatch):
+    """The restore of one paste must finish before the next paste reads the clipboard."""
+    x = FakeX(monkeypatch)
+    monkeypatch.setattr(core.time, "sleep", lambda s: (x.events.append("wait"), time.sleep(0.05))[0])
+
+    errors = run_in_threads([lambda: core.output_text("eins", "paste"),
+                             lambda: core.output_text("zwei", "paste")])
+
+    kinds = [e if isinstance(e, str) else e[0] for e in x.events]
+    assert errors == []
+    assert kinds == ["read", "write", "key", "wait", "write"] * 2
+    assert x.clipboard == b"old text"                  # the user's text, not a dictation
 
 
 # --- config ------------------------------------------------------------------------------------

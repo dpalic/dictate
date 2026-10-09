@@ -341,9 +341,43 @@ def paste_text(text):
                 log.warning("could not restore the previous clipboard text")
 
 
+class _OrderedLock:
+    """A lock that lets callers in strictly in the order they asked (threading.Lock does not
+    promise that). Used as a context manager; released on every exit, also on exceptions."""
+
+    def __init__(self):
+        self._cond = threading.Condition()
+        self._next_ticket = 0
+        self._serving = 0
+
+    def __enter__(self):
+        with self._cond:
+            ticket = self._next_ticket
+            self._next_ticket += 1
+            while ticket != self._serving:
+                self._cond.wait()
+
+    def __exit__(self, *exc_info):
+        with self._cond:
+            self._serving += 1
+            self._cond.notify_all()
+
+
+# One dictation is inserted at a time. Without this, two results arriving together would
+# interleave their typed characters, and one paste could read, replace and restore the
+# clipboard in the middle of another one.
+_output_lock = _OrderedLock()
+
+
 def output_text(text, method="paste"):
     """Get text into the focused window by pasting or by typing key presses. True when it worked.
-    Pasting that cannot work here falls back to typing, with one notice per run."""
+    Pasting that cannot work here falls back to typing, with one notice per run.
+    Calls are served one after the other, in the order they arrive."""
+    with _output_lock:
+        return _output_text_locked(text, method)
+
+
+def _output_text_locked(text, method):
     global _paste_fallback_told
     t0 = time.monotonic()
     used, ok = "type", None
