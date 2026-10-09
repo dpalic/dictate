@@ -1,0 +1,43 @@
+gui.py
+  s_75d7293523bbdb::t_6ecf83d7bcca34 22-23
+  s_75d7293523bbdb::t_3ffc6b2f5f6e6a 45,47
+  s_75d7293523bbdb::t_58d5d3c8dcd5b8 417-419,423
+  s_75d7293523bbdb::t_10c4bbcd764206 432-433
+  s_75d7293523bbdb::t_4623990e2f6864 7
+  s_75d7293523bbdb::t_3478ee39bf4df9 394-398
+  s_75d7293523bbdb::t_5328d4ede83453 358-360
+  s_75d7293523bbdb::t_6464a834fd36bd 611-620,623-626,632-633,639-641,643,645-649,651,655-697
+  s_75d7293523bbdb::t_3e5d35f34aaf21 698
+tests/test_keep_audio_ui.py
+  s_75d7293523bbdb::t_68c3098530e38a 1-270
+README.md
+  s_75d7293523bbdb::t_fced71b1f98149 88
+core.py
+  s_75d7293523bbdb::t_d3ea0fb7b6db7c 300-302,305-309,311-312,319-323,325-365
+  s_75d7293523bbdb::t_ea48774d53acc7 205
+  s_75d7293523bbdb::t_4a49fe2de47906 221-222,225-227
+  s_75d7293523bbdb::t_eb30b3e910b1af 191,193
+  s_75d7293523bbdb::t_cc5e17bbf9c15a 313-318
+tests/conftest.py
+  s_75d7293523bbdb::t_c450f35e70b900 1-4
+tests/test_pending.py
+  s_75d7293523bbdb::t_50d2151b880636 54-55
+  s_75d7293523bbdb::t_7c1922d6423b4d 1-21,26-53,56-189
+  s_75d7293523bbdb::t_304533cf558e93 22-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "586fb67d3ce28b3d60ea6d8f0ee116192534dc0a",
+  "prompts": {},
+  "sessions": {
+    "s_75d7293523bbdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7833327-04a7-49da-90ef-76796eaf3993",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Darko Palic <darko.palic@xenovation.com>"
+    }
+  }
+}
