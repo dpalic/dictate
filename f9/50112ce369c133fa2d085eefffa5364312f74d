@@ -1,0 +1,37 @@
+gui.py
+  s_75d7293523bbdb::t_556061ec52d596 45
+  s_75d7293523bbdb::t_6c9cbca9573c5e 378-379
+  s_75d7293523bbdb::t_0ebd06b955d5f8 531-534,537,540-553,556,562-564,566-572
+tests/test_capslock.py
+  s_75d7293523bbdb::t_48e5ce2024335f 29-31,33
+  s_75d7293523bbdb::t_f5a97be3515e9f 202,208-221,226,228,233-257
+  s_75d7293523bbdb::t_eddf35789af6a1 318-495
+  s_75d7293523bbdb::t_f4e8ef02016c5e 190
+  s_75d7293523bbdb::t_ed79f0dc63bf30 2
+  s_75d7293523bbdb::t_08d27c74eb973d 258-259
+tests/test_capslock_ui.py
+  s_75d7293523bbdb::t_24682927c27574 259-368
+  s_75d7293523bbdb::t_95f641a9ddc3b3 3-4,11-27
+  s_75d7293523bbdb::t_e87f53cd3dc1dc 140-145,147-148,156,163
+  s_75d7293523bbdb::t_b59e49e9ce9e5c 114,118
+  s_75d7293523bbdb::t_709db5ac451533 28
+capslock.py
+  s_75d7293523bbdb::t_01eaff89656cf7 10-11,19,24,30-31,33-37,54-56,59,64-65,67,70-72,78-94,98,101-115,117-119,121-122,125,128-156,172-179,182-183,186,194-195,201,205
+  s_75d7293523bbdb::t_1fe17bbffb6788 32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f950112ce369c133fa2d085eefffa5364312f74d",
+  "prompts": {},
+  "sessions": {
+    "s_75d7293523bbdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7833327-04a7-49da-90ef-76796eaf3993",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Darko Palic <darko.palic@xenovation.com>"
+    }
+  }
+}
