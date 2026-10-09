@@ -1,0 +1,23 @@
+core.py
+  s_75d7293523bbdb::t_8983b757c61535 344-371,374-380
+tests/test_paste.py
+  s_75d7293523bbdb::t_42e3c46611b4e9 4-5
+  s_75d7293523bbdb::t_87d96ae4fa5509 290-342,344-417
+  s_75d7293523bbdb::t_70e7e819d0d683 343
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fe07e25b61c792791f3e10cfc557a712469f4f70",
+  "prompts": {},
+  "sessions": {
+    "s_75d7293523bbdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7833327-04a7-49da-90ef-76796eaf3993",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Darko Palic <darko.palic@xenovation.com>"
+    }
+  }
+}
