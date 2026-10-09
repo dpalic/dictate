@@ -42,6 +42,7 @@ class Bridge(QObject):
     other_press = pyqtSignal()
     transcribed = pyqtSignal(str)
     error = pyqtSignal(str)
+    capslock_done = pyqtSignal(bool, str)   # managed flag, message: result of the worker thread
 
 
 class SettingsDialog(QDialog):
@@ -374,6 +375,8 @@ class MainWindow(QMainWindow):
         self.bridge.other_press.connect(self.on_other_press)
         self.bridge.transcribed.connect(self.on_transcribed)
         self.bridge.error.connect(self.on_error)
+        self.bridge.capslock_done.connect(self._on_capslock_done)
+        self._capslock_lock = threading.Lock()   # one desktop change at a time
         self.key_held = False
         self.combo = False
         self.recording_active = False
@@ -525,24 +528,48 @@ class MainWindow(QMainWindow):
     def _apply_capslock_setting(self):
         """Caps Lock as hotkey with 'disable' ticked: switch its function off in the
         desktop, but only while the evdev listener reads the raw key; without it
-        (pynput fallback) the hotkey would stop working altogether."""
+        (pynput fallback) the hotkey would stop working altogether.
+
+        gsettings, xset and xdotool can hang, so the work runs on a worker thread; the
+        result comes back through a signal and is handled on the GUI thread."""
         wanted = self.cfg.get("key") == "caps_lock" and bool(self.cfg.get("disable_capslock", True))
         evdev_active = self._listener_is_evdev()
-        managed, message = capslock.apply(wanted and evdev_active, bool(self.cfg.get("capslock_managed")))
+        notice = ""
         if wanted and not evdev_active:
             core.log.info("caps lock function kept: the listener has no direct access to the input devices")
-            message = message or "Caps Lock keeps its function until Dictate can read the input devices (log out and in again)"
+            notice = "Caps Lock keeps its function until Dictate can read the input devices (log out and in again)"
+        threading.Thread(target=self._capslock_worker, args=(wanted and evdev_active, notice),
+                         daemon=True).start()
+
+    def _capslock_worker(self, wanted, notice):
+        with self._capslock_lock:
+            try:
+                managed, message = capslock.apply(wanted, bool(self.cfg.get("capslock_managed")))
+            except Exception as e:      # apply() reports its own errors; this is the last net
+                core.log.exception("caps lock handling failed")
+                managed, message = bool(self.cfg.get("capslock_managed")), f"Caps Lock handling failed: {e}"
+        self.bridge.capslock_done.emit(managed, message or notice)
+
+    def _on_capslock_done(self, managed, message):
         if message:
             core.log.warning(message)
-            core.notify(message, urgency="normal", timeout_ms=5000)
+            threading.Thread(target=core.notify, args=(message, "normal", 5000), daemon=True).start()
         if managed != bool(self.cfg.get("capslock_managed")):
             self.cfg["capslock_managed"] = managed
             core.save_config(self.cfg)
 
     def _release_capslock(self):
-        """Give the Caps Lock function back if this app switched it off."""
+        """Give the Caps Lock function back if this app switched it off. Runs while the app
+        closes, so it stays synchronous, but with short timeouts, and it does not wait for a
+        busy worker for longer than a moment."""
         was_managed = bool(self.cfg.get("capslock_managed"))
-        managed, message = capslock.apply(False, was_managed)
+        got_lock = self._capslock_lock.acquire(timeout=capslock.QUIT_LOCK_WAIT_S)
+        try:
+            managed, message = capslock.apply(False, was_managed,
+                                              backend=capslock.Gsettings(timeout=capslock.QUIT_TIMEOUT_S))
+        finally:
+            if got_lock:
+                self._capslock_lock.release()
         if message:
             core.log.warning(message)
         if managed != was_managed:

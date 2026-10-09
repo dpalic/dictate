@@ -1,10 +1,30 @@
 """Caps Lock checkbox in Settings, and applying it when the listener starts."""
 import os
+import threading
+import time
 
 import pytest
 
 pytest.importorskip("PyQt6")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+REAL_THREAD = threading.Thread    # kept before the fixtures replace it
+
+
+class InlineThread:
+    """Runs its target at once, so a test sees the result right after the call."""
+
+    def __init__(self, target=None, args=(), daemon=None, **kwargs):
+        self.target, self.args = target, args
+
+    def start(self):
+        self.target(*self.args)
+
+
+@pytest.fixture(autouse=True)
+def never_touch_the_real_marker(monkeypatch, tmp_path):
+    import capslock
+    monkeypatch.setattr(capslock, "MARKER", tmp_path / "state" / "capslock-managed")
 
 
 @pytest.fixture(scope="module")
@@ -91,10 +111,11 @@ class Recorder:
 
     def __init__(self, result=(False, "")):
         self.result = result
-        self.applied, self.notified, self.saved = [], [], []
+        self.applied, self.notified, self.saved, self.backends = [], [], [], []
 
     def apply(self, wanted, managed, backend=None):
         self.applied.append((wanted, managed))
+        self.backends.append(backend)
         return self.result
 
     def notify(self, msg, urgency="normal", timeout_ms=1500):
@@ -116,9 +137,15 @@ def make_window(gui_module, monkeypatch):
         def stop(self):
             pass
 
-    windows = []
+    windows, threads = [], []
 
-    def make(key, evdev, disable=True, managed=False, result=(False, "")):
+    class Recording(REAL_THREAD):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            threads.append(self)
+
+    def make(key, evdev, disable=True, managed=False, result=(False, ""), inline=True):
+        """inline=True runs worker threads at once (deterministic); False uses real ones."""
         cfg = dict(gui_module.core.DEFAULT_CONFIG, key=key, disable_capslock=disable,
                    capslock_managed=managed)
         rec = Recorder(result)
@@ -126,12 +153,14 @@ def make_window(gui_module, monkeypatch):
         monkeypatch.setattr(gui_module.core, "save_config", rec.save_config)
         monkeypatch.setattr(gui_module.core, "notify", rec.notify)
         monkeypatch.setattr(gui_module.capslock, "apply", rec.apply)
+        monkeypatch.setattr(gui_module.threading, "Thread", InlineThread if inline else Recording)
         monkeypatch.setattr(gui_module, "_make_listener",
                             lambda on_press, on_release: FakeEvdev() if evdev else FakePynput())
         window = gui_module.MainWindow()
         windows.append(window)
         return window, rec
 
+    make.threads = threads
     yield make
 
     # A window that outlives its test must not fire its quit handler against the real desktop.
@@ -226,4 +255,114 @@ def test_failure_message_reaches_the_user(make_window):
     window, rec = make_window("caps_lock", evdev=True, result=(False, "Could not change the Caps Lock setting: no dbus"))
 
     assert rec.notified == ["Could not change the Caps Lock setting: no dbus"]
+    window.close()
+
+
+# --- the desktop calls stay off the GUI thread -------------------------------------------------
+
+def settle(qapp, threads):
+    """Wait for the worker threads and deliver their signals to the GUI thread."""
+    for _ in range(3):
+        for thread in list(threads):
+            thread.join(5)
+        qapp.processEvents()
+
+
+def test_a_hung_desktop_call_does_not_freeze_the_gui_thread(make_window, gui_module, qapp, monkeypatch):
+    window, rec = make_window("caps_lock", evdev=True, inline=False)
+    settle(qapp, make_window.threads)
+    rec.saved.clear()
+    entered, release = threading.Event(), threading.Event()
+
+    def hung_apply(wanted, managed, backend=None):
+        entered.set()
+        assert release.wait(5), "the test never released the worker"
+        return True, ""
+
+    monkeypatch.setattr(gui_module.capslock, "apply", hung_apply)
+
+    started = time.monotonic()
+    window._apply_capslock_setting()
+    took = time.monotonic() - started
+
+    assert took < 0.5                    # the GUI thread came back at once ...
+    assert entered.wait(5)               # ... while the worker really sits in the hung call
+    assert rec.saved == []
+    release.set()
+    settle(qapp, make_window.threads)
+    assert rec.saved[-1]["capslock_managed"] is True      # the result arrives on the GUI thread
+    window.close()
+
+
+def test_two_desktop_changes_never_run_at_the_same_time(make_window, gui_module, qapp, monkeypatch):
+    window, rec = make_window("caps_lock", evdev=True, inline=False)
+    settle(qapp, make_window.threads)
+    gate, first_in = threading.Event(), threading.Event()
+    running, peak, guard = [], [0], threading.Lock()
+
+    def slow_apply(wanted, managed, backend=None):
+        with guard:
+            running.append(1)
+            peak[0] = max(peak[0], len(running))
+        first_in.set()
+        gate.wait(5)
+        with guard:
+            running.pop()
+        return False, ""
+
+    monkeypatch.setattr(gui_module.capslock, "apply", slow_apply)
+
+    window._apply_capslock_setting()
+    assert first_in.wait(5)
+    window._apply_capslock_setting()     # for example Settings saved while the first change runs
+    time.sleep(0.2)
+    assert len(running) == 1             # the second one waits for the first
+    gate.set()
+    settle(qapp, make_window.threads)
+
+    assert peak[0] == 1
+    window.close()
+
+
+def test_closing_uses_short_timeouts(make_window, gui_module):
+    window, rec = make_window("caps_lock", evdev=True, managed=True)
+    rec.backends.clear()
+
+    window._release_capslock()
+
+    backend = rec.backends[-1]
+    assert isinstance(backend, gui_module.capslock.Gsettings)
+    assert backend.timeout == gui_module.capslock.QUIT_TIMEOUT_S
+    window.close()
+
+
+def test_closing_does_not_wait_long_for_a_busy_worker(make_window, gui_module, monkeypatch):
+    monkeypatch.setattr(gui_module.capslock, "QUIT_LOCK_WAIT_S", 0.1)
+    window, rec = make_window("caps_lock", evdev=True, managed=True)
+    rec.applied.clear()
+    window._capslock_lock.acquire()      # a worker is busy
+    try:
+        started = time.monotonic()
+        window._release_capslock()
+        took = time.monotonic() - started
+    finally:
+        window._capslock_lock.release()
+
+    assert took < 1.0
+    assert rec.applied == [(False, True)]          # the function is given back anyway
+    window.close()
+
+
+def test_an_unexpected_error_in_the_worker_is_reported(make_window, gui_module, monkeypatch):
+    window, rec = make_window("caps_lock", evdev=True)
+    rec.notified.clear()
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("kaboom")
+
+    monkeypatch.setattr(gui_module.capslock, "apply", boom)
+
+    window._apply_capslock_setting()
+
+    assert len(rec.notified) == 1 and "kaboom" in rec.notified[0]
     window.close()
