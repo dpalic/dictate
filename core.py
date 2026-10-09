@@ -3,8 +3,12 @@ import io
 import json
 import logging
 import logging.handlers
+import os
+import re
+import shutil
 import subprocess
 import threading
+import time
 import wave
 from pathlib import Path
 
@@ -124,6 +128,7 @@ DEFAULT_CONFIG = {
     "openai_api_key":        "",   # OpenAI key
     "mode":                  "ptt",
     "key":                   "f9",
+    "output_method":         "paste",   # how the text reaches the focused window: "paste" or "type"
     "model":                 DEFAULT_MODEL,
     "threshold":             0.0,
     "local_stt_num_threads": 4,    # sherpa-onnx CPU thread count for parakeet_local
@@ -225,6 +230,130 @@ def type_text(text):
     log.error("no typing tool found (xdotool, ydotool) — text not typed")
     notify("Typing failed: neither xdotool nor ydotool is installed", urgency="critical", timeout_ms=5000)
     return False
+
+
+# --- pasting instead of typing -------------------------------------------------------------
+# Typing sends one fake key press per character, and a terminal with its input method
+# handles each one separately, so long text can take seconds. Pasting is one key press.
+
+OUTPUT_METHODS = ("paste", "type")
+PASTE_SETTLE_S = 0.5   # time the focused program gets to read the clipboard before it is restored
+_PASTE_LIKE_XTERM = ("xterm", "uxterm", "urxvt", "st", "st-256color")   # paste with Shift+Insert
+_TERMINALS = ("gnome-terminal", "kgx", "konsole", "xfce4-terminal", "lxterminal", "mate-terminal",
+              "terminator", "tilix", "alacritty", "kitty", "wezterm", "foot", "guake", "yakuake",
+              "terminology", "sakura", "qterminal", "tabby", "cool-retro-term")   # Ctrl+Shift+V
+_paste_fallback_told = False
+
+
+class PasteUnavailable(Exception):
+    """Pasting cannot work here (not X11, no clipboard tool); typing is the fallback."""
+
+
+def paste_shortcut(window_class):
+    """Key combination that pastes in the window with this WM_CLASS (names separated by spaces)."""
+    names = (window_class or "").lower().split()
+    if any(n in _PASTE_LIKE_XTERM for n in names):
+        return "shift+Insert"
+    if any(t in n for n in names for t in _TERMINALS):
+        return "ctrl+shift+v"
+    return "ctrl+v"
+
+
+def _active_window_class():
+    """WM_CLASS names of the focused X11 window, or '' when unknown."""
+    try:
+        win = subprocess.run(["xdotool", "getactivewindow"], capture_output=True,
+                             text=True, timeout=3).stdout.strip()
+        if not win:
+            return ""
+        out = subprocess.run(["xprop", "-id", win, "WM_CLASS"], capture_output=True,
+                             text=True, timeout=3).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return " ".join(re.findall(r'"([^"]*)"', out))
+
+
+def _clipboard_commands():
+    """(read, write) commands for the X11 clipboard, or None when neither xclip nor xsel is installed."""
+    if shutil.which("xclip"):
+        return (["xclip", "-selection", "clipboard", "-o"], ["xclip", "-selection", "clipboard", "-i"])
+    if shutil.which("xsel"):
+        return (["xsel", "--clipboard", "--output"], ["xsel", "--clipboard", "--input"])
+    return None
+
+
+def _write_clipboard(cmd, data):
+    # The tool forks to keep owning the clipboard, so its output must not be piped back to us.
+    subprocess.run(cmd, input=data, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                   check=True, timeout=5)
+
+
+def _read_clipboard(cmd):
+    """Current clipboard text as bytes, or None when it is empty or not text."""
+    try:
+        r = subprocess.run(cmd, capture_output=True, timeout=3)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return r.stdout if r.returncode == 0 else None
+
+
+def paste_text(text):
+    """Put text on the clipboard, press the paste shortcut of the focused window, then restore
+    the previous clipboard text. True when the shortcut was sent, False when that failed.
+    Raises PasteUnavailable when pasting cannot work here (nothing was inserted then)."""
+    if not text:
+        return True
+    if os.environ.get("XDG_SESSION_TYPE") != "x11" or not shutil.which("xdotool"):
+        raise PasteUnavailable("pasting needs an X11 session with xdotool; Wayland does not tell "
+                               "which window has the focus")
+    tools = _clipboard_commands()
+    if tools is None:
+        raise PasteUnavailable("no clipboard tool, install xclip or xsel")
+    read_cmd, write_cmd = tools
+    previous = _read_clipboard(read_cmd)
+    shortcut = paste_shortcut(_active_window_class())
+    try:
+        _write_clipboard(write_cmd, text.encode())
+    except (OSError, subprocess.SubprocessError) as e:
+        raise PasteUnavailable(f"could not write the clipboard: {e}") from e
+    try:
+        r = subprocess.run(["xdotool", "key", "--clearmodifiers", shortcut], check=False, timeout=5)
+        if r.returncode != 0:
+            log.error("xdotool exited with %s — paste shortcut %s not sent", r.returncode, shortcut)
+            notify(f"Pasting failed (xdotool exit {r.returncode})", urgency="critical", timeout_ms=5000)
+            return False
+        time.sleep(PASTE_SETTLE_S)   # the program reads the clipboard after the key press
+        return True
+    finally:
+        # Only text can be restored; if the clipboard held something else, the dictated text stays.
+        if previous is not None:
+            try:
+                _write_clipboard(write_cmd, previous)
+            except (OSError, subprocess.SubprocessError):
+                log.warning("could not restore the previous clipboard text")
+
+
+def output_text(text, method="paste"):
+    """Get text into the focused window by pasting or by typing key presses. True when it worked.
+    Pasting that cannot work here falls back to typing, with one notice per run."""
+    global _paste_fallback_told
+    t0 = time.monotonic()
+    used, ok = "type", None
+    if method != "type":
+        try:
+            ok = paste_text(text)
+            used = "paste"
+        except PasteUnavailable as e:
+            log.warning("paste not possible, typing instead: %s", e)
+            if not _paste_fallback_told:
+                _paste_fallback_told = True
+                notify(f"Pasting is not possible here ({e}); typing the text instead",
+                       urgency="normal", timeout_ms=6000)
+    if ok is None:
+        ok = type_text(text)
+    log.info("output via %s: %d chars in %.2fs, %s", used, len(text or ""),
+             time.monotonic() - t0, "ok" if ok else "failed")
+    return ok
 
 
 class Recorder:
