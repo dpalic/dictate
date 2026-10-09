@@ -1,0 +1,21 @@
+run.sh
+  s_75d7293523bbdb::t_c3c3720c2893e8 25-26
+  s_75d7293523bbdb::t_9afa22ac7759a6 4
+  s_75d7293523bbdb::t_14fd31f0abb3ef 11-24,27-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2375db4c4967d87de261c65eae3baed435e4020f",
+  "prompts": {},
+  "sessions": {
+    "s_75d7293523bbdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7833327-04a7-49da-90ef-76796eaf3993",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Darko Palic <darko.palic@xenovation.com>"
+    }
+  }
+}
