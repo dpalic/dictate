@@ -9,13 +9,14 @@ import numpy as np
 from PyQt6.QtCore import Qt, QObject, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import (
-    QApplication, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox,
-    QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu,
-    QMessageBox, QPushButton, QSpinBox, QSystemTrayIcon, QTextEdit,
+    QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+    QDoubleSpinBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
+    QMenu, QMessageBox, QPushButton, QSpinBox, QSystemTrayIcon, QTextEdit,
     QVBoxLayout, QWidget,
 )
 from pynput import keyboard
 
+import capslock
 import core
 
 
@@ -111,6 +112,23 @@ class SettingsDialog(QDialog):
         self.key_box.setCurrentIndex(max(i, 0))
         self.form.addRow("Hotkey:", self.key_box)
 
+        # Only offered with Caps Lock as hotkey: otherwise every press would also
+        # toggle Caps Lock and the typed text would come out in capitals.
+        self.capslock_box = QCheckBox("Disable the Caps Lock function (use the key only for dictation)")
+        self.capslock_box.setChecked(bool(self.cfg.get("disable_capslock", True)))
+        if capslock.is_available():
+            self.capslock_box.setToolTip(
+                "Switches the Caps Lock function off in the desktop (GNOME keyboard option\n"
+                "caps:none) while Dictate runs with direct access to the input devices\n"
+                "(group 'input'). Until it has that access, Caps Lock keeps working.\n"
+                "Uncheck it, or pick another hotkey, to get Caps Lock back."
+            )
+        else:
+            self.capslock_box.setEnabled(False)
+            self.capslock_box.setToolTip("Needs GNOME (the gsettings tool) to change the desktop setting.")
+        self.form.addRow("", self.capslock_box)
+        self.key_box.currentIndexChanged.connect(self._update_capslock_row)
+
         self.model_box = QComboBox()
         self.form.addRow("Model:", self.model_box)
 
@@ -170,6 +188,10 @@ class SettingsDialog(QDialog):
         self._dl_done.connect(self._on_download_done)
         self.refresh_model_box(self.cfg.get("model", core.DEFAULT_MODEL))
         self.on_provider_changed()
+        self._update_capslock_row()
+
+    def _update_capslock_row(self):
+        self.form.setRowVisible(self.capslock_box, self.key_box.currentData() == "caps_lock")
 
     def on_provider_changed(self):
         # Persist edits to the previously-shown provider's key (if any) before
@@ -300,6 +322,7 @@ class SettingsDialog(QDialog):
             "openai_api_key":        self._keys.get("openai", ""),
             "mode":                  self.mode_box.currentData(),
             "key":                   self.key_box.currentData(),
+            "disable_capslock":      self.capslock_box.isChecked(),
             "model":                 self.model_box.currentData(),
             "threshold":             float(self.threshold_box.value()),
             "local_stt_num_threads": int(self.local_threads_box.value()),
@@ -487,6 +510,31 @@ class MainWindow(QMainWindow):
                 pass
 
         self.listener = _make_listener(on_press, on_release)
+        self._apply_capslock_setting()
+
+    def _listener_is_evdev(self):
+        try:
+            import evdev_listener
+        except Exception:
+            return False
+        return isinstance(self.listener, evdev_listener.Listener)
+
+    def _apply_capslock_setting(self):
+        """Caps Lock as hotkey with 'disable' ticked: switch its function off in the
+        desktop, but only while the evdev listener reads the raw key; without it
+        (pynput fallback) the hotkey would stop working altogether."""
+        wanted = self.cfg.get("key") == "caps_lock" and bool(self.cfg.get("disable_capslock", True))
+        evdev_active = self._listener_is_evdev()
+        managed, message = capslock.apply(wanted and evdev_active, bool(self.cfg.get("capslock_managed")))
+        if wanted and not evdev_active:
+            core.log.info("caps lock function kept: the listener has no direct access to the input devices")
+            message = message or "Caps Lock keeps its function until Dictate can read the input devices (log out and in again)"
+        if message:
+            core.log.warning(message)
+            core.notify(message, urgency="normal", timeout_ms=5000)
+        if managed != bool(self.cfg.get("capslock_managed")):
+            self.cfg["capslock_managed"] = managed
+            core.save_config(self.cfg)
 
     def restart_listener(self):
         if self.listener:
