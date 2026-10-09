@@ -10,10 +10,10 @@ import numpy as np
 from PyQt6.QtCore import Qt, QObject, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import (
-    QApplication, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox,
-    QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu,
-    QMessageBox, QPushButton, QSpinBox, QSystemTrayIcon, QTextEdit,
-    QVBoxLayout, QWidget,
+    QApplication, QButtonGroup, QComboBox, QDialog, QDialogButtonBox,
+    QDoubleSpinBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
+    QMenu, QMessageBox, QPushButton, QRadioButton, QSpinBox, QSystemTrayIcon,
+    QTextEdit, QVBoxLayout, QWidget,
 )
 from pynput import keyboard
 
@@ -405,6 +405,32 @@ class MainWindow(QMainWindow):
         )
         v.addWidget(self.last)
 
+        # How the text reaches the focused window; changes apply to the next dictation.
+        output_row = QHBoxLayout()
+        output_row.addWidget(QLabel("Insert text by:"))
+        self.paste_radio = QRadioButton("Paste")
+        self.paste_radio.setToolTip(
+            "Puts the text on the clipboard and presses the paste shortcut of the focused\n"
+            "window (Ctrl+Shift+V in terminals), then restores your clipboard text. Fast."
+        )
+        self.type_radio = QRadioButton("Type keys")
+        self.type_radio.setToolTip(
+            "Sends the text as key presses, one per character. Leaves the clipboard alone,\n"
+            "but long text can take seconds to arrive in some terminals."
+        )
+        self.output_group = QButtonGroup(self)
+        self.output_group.addButton(self.paste_radio)
+        self.output_group.addButton(self.type_radio)
+        if self.cfg.get("output_method", "paste") == "type":
+            self.type_radio.setChecked(True)
+        else:
+            self.paste_radio.setChecked(True)
+        self.paste_radio.toggled.connect(self.on_output_method_changed)
+        output_row.addWidget(self.paste_radio)
+        output_row.addWidget(self.type_radio)
+        output_row.addStretch()
+        v.addLayout(output_row)
+
         v.addStretch()
 
         self.tray = None
@@ -656,14 +682,20 @@ class MainWindow(QMainWindow):
         """Type the text; only when that worked is the saved recording deleted."""
         saved = Path(path) if path else None
         try:
-            if core.type_text(text):
+            if core.output_text(text, self.cfg.get("output_method", "paste")):
                 if saved:
                     core.discard_pending(saved)
             else:
                 kept = "Recording kept, press Retry. " if saved else ""
-                self.bridge.error.emit(f"{kept}Typing failed")
+                self.bridge.error.emit(f"{kept}Inserting the text failed")
         finally:
             self._finish_attempt(saved)
+
+    def on_output_method_changed(self):
+        method = "type" if self.type_radio.isChecked() else "paste"
+        if method != self.cfg.get("output_method"):
+            self.cfg["output_method"] = method
+            core.save_config(self.cfg)
 
     def pending_files(self):
         """Saved recordings that wait for a retry (not those being transcribed right now)."""

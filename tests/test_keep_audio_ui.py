@@ -52,14 +52,16 @@ def make_app(gui_module, monkeypatch):
         def stop(self):
             pass
 
-    def make():
-        state = SimpleNamespace(audio=LOUD, typed=[], errors=[], type_ok=True,
-                                transcribe=lambda audio, cfg: "hello")
-        cfg = dict(core.DEFAULT_CONFIG)
+    def make(**config):
+        state = SimpleNamespace(audio=LOUD, typed=[], methods=[], errors=[], saved_configs=[],
+                                type_ok=True, transcribe=lambda audio, cfg: "hello")
+        cfg = dict(core.DEFAULT_CONFIG, **config)
         monkeypatch.setattr(core, "load_config", lambda: dict(cfg))
+        monkeypatch.setattr(core, "save_config", lambda c: state.saved_configs.append(dict(c)))
         monkeypatch.setattr(core, "notify", lambda *a, **k: None)
         monkeypatch.setattr(core, "transcribe", lambda audio, cfg: state.transcribe(audio, cfg))
-        monkeypatch.setattr(core, "type_text", lambda text: (state.typed.append(text), state.type_ok)[1])
+        monkeypatch.setattr(core, "output_text", lambda text, method="paste": (
+            state.typed.append(text), state.methods.append(method), state.type_ok)[2])
         monkeypatch.setattr(core.Recorder, "finish", staticmethod(lambda take: state.audio))
         monkeypatch.setattr(gui_module, "_make_listener", lambda press, release: FakeListener())
         monkeypatch.setattr(gui_module.time, "sleep", lambda seconds: None)
@@ -162,7 +164,7 @@ def test_a_typing_failure_keeps_the_recording(app):
 
     assert app.typed == ["hello"]
     assert len(core.list_pending()) == 1
-    assert "Typing failed" in app.errors[0] and "Recording kept" in app.errors[0]
+    assert "Inserting the text failed" in app.errors[0] and "Recording kept" in app.errors[0]
     assert not app.window.retry_btn.isHidden()
 
 
@@ -233,6 +235,47 @@ def test_an_unreadable_recording_is_removed_and_does_not_block_the_others(app):
     app.window.on_retry()           # now the good one
 
     assert heard == [1] and core.list_pending() == []
+
+
+# --- paste or type keys ------------------------------------------------------------------------
+
+def test_paste_is_the_default_and_the_radio_buttons_sit_below_the_transcription(app):
+    window = app.window
+    layout = window.centralWidget().layout()
+    index = next(i for i in range(layout.count()) if layout.itemAt(i).widget() is window.last)
+    row = layout.itemAt(index + 1).layout()
+
+    assert window.paste_radio.isChecked() and not window.type_radio.isChecked()
+    assert [row.itemAt(i).widget() for i in (0, 1, 2)][1:] == [window.paste_radio, window.type_radio]
+    assert row.itemAt(0).widget().text() == "Insert text by:"
+
+
+def test_a_saved_choice_of_typing_keys_is_restored_at_start(make_app):
+    app = make_app(output_method="type")
+
+    assert app.window.type_radio.isChecked() and not app.window.paste_radio.isChecked()
+
+
+def test_dictation_uses_the_chosen_method_and_a_switch_applies_to_the_next_one(app):
+    dictate(app)
+    app.window.type_radio.setChecked(True)
+    dictate(app)
+    app.window.paste_radio.setChecked(True)
+    dictate(app)
+
+    assert app.methods == ["paste", "type", "paste"]
+
+
+def test_switching_saves_the_choice_once_per_change(app):
+    app.window.type_radio.setChecked(True)
+    app.window.type_radio.setChecked(True)      # no change, nothing to save
+    app.window.paste_radio.setChecked(True)
+
+    assert [c["output_method"] for c in app.saved_configs] == ["type", "paste"]
+
+
+def test_starting_does_not_write_the_config(app):
+    assert app.saved_configs == []
 
 
 # --- start-up ------------------------------------------------------------------------------
