@@ -353,6 +353,31 @@ def test_closing_does_not_wait_long_for_a_busy_worker(make_window, gui_module, m
     window.close()
 
 
+# --- the "Last transcription" area follows the window ------------------------------------------
+
+def test_last_transcription_area_grows_with_the_window_in_both_directions(make_window, gui_module, qapp):
+    window, _ = make_window("f9", evdev=True)
+    window.show()
+    qapp.processEvents()
+    before = window.last.size()
+
+    window.resize(window.width() + 200, window.height() + 150)
+    qapp.processEvents()
+
+    assert window.last.width() >= before.width() + 150
+    assert window.last.height() >= before.height() + 100
+    window.close()
+
+
+def test_last_transcription_area_has_a_minimum_size(make_window, gui_module):
+    window, _ = make_window("f9", evdev=True)
+
+    assert window.last.minimumWidth() == gui_module.LAST_MIN_WIDTH
+    assert window.last.minimumHeight() == gui_module.LAST_MIN_HEIGHT
+    assert window.last.maximumHeight() > gui_module.LAST_MIN_HEIGHT     # no fixed cap any more
+    window.close()
+
+
 def test_an_unexpected_error_in_the_worker_is_reported(make_window, gui_module, monkeypatch):
     window, rec = make_window("caps_lock", evdev=True)
     rec.notified.clear()

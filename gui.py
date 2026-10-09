@@ -360,6 +360,10 @@ STATUS_STYLES = {
 }
 
 
+LAST_MIN_WIDTH = 360     # smallest size of the "Last transcription" area; it grows from here
+LAST_MIN_HEIGHT = 110    # the height it had before it became resizable
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -413,13 +417,11 @@ class MainWindow(QMainWindow):
         v.addWidget(QLabel("Last transcription:"))
         self.last = QTextEdit()
         self.last.setReadOnly(True)
-        self.last.setMaximumHeight(110)
+        self.last.setMinimumSize(LAST_MIN_WIDTH, LAST_MIN_HEIGHT)   # grows with the window from here
         self.last.setStyleSheet(
             "QTextEdit { background: #fafafa; border: 1px solid #ddd; border-radius: 6px; padding: 6px; }"
         )
-        v.addWidget(self.last)
-
-        v.addStretch()
+        v.addWidget(self.last, 1)
 
         self.tray = None
         if QSystemTrayIcon.isSystemTrayAvailable():
