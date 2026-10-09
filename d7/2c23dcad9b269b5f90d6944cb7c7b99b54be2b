@@ -1,0 +1,24 @@
+tests/test_keep_audio_ui.py
+  s_75d7293523bbdb::t_ce36e3747631b9 33-46
+  s_75d7293523bbdb::t_ecbead3386c326 255,259-267,278-279
+  s_75d7293523bbdb::t_edf65a91e9dd63 3
+  s_75d7293523bbdb::t_e182ddbeb7622d 238-254,256-258,268-277,280-289
+gui.py
+  s_75d7293523bbdb::t_29b7701a53d770 696-699
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d72c23dcad9b269b5f90d6944cb7c7b99b54be2b",
+  "prompts": {},
+  "sessions": {
+    "s_75d7293523bbdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7833327-04a7-49da-90ef-76796eaf3993",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Darko Palic <darko.palic@xenovation.com>"
+    }
+  }
+}
