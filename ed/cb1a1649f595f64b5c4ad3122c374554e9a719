@@ -1,0 +1,34 @@
+requirements.txt
+  s_75d7293523bbdb::t_2e1350d7c25946 9
+  s_75d7293523bbdb::t_4de9ddc8cd91f9 1-8
+run.sh
+  s_75d7293523bbdb::t_c3c3720c2893e8 87-88
+  s_75d7293523bbdb::t_14fd31f0abb3ef 21,26-27,42-43,84-86,89,91-96,101-104,114
+  s_75d7293523bbdb::t_5dd923e03428a1 1,13-15,17,164-165
+  s_75d7293523bbdb::t_e915ea5a92ca61 2-3,9-11,20,22-24,28-41,44-54,67-83,90,97-100,105-106,108-113,115-129,154,156-158,161-162
+  s_75d7293523bbdb::t_cc98f640ca35dc 4-8,12,16,18-19,25,55-66,107,131-153,155,159
+  s_75d7293523bbdb::t_8c9c144786a181 130
+  s_75d7293523bbdb::t_6fe9e42954fd2b 160
+  s_75d7293523bbdb::t_4117d32f4520c7 163
+  s_75d7293523bbdb::t_a0f3424581ffbd 166-168
+  s_75d7293523bbdb::t_3ebe37f59dc781 169-190,194-196,200-218,220
+README.md
+  s_75d7293523bbdb::t_bd79408c98ac63 78
+  s_75d7293523bbdb::t_711dbd8aa23a07 34,37,39-41,45,47-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "edcb1a1649f595f64b5c4ad3122c374554e9a719",
+  "prompts": {},
+  "sessions": {
+    "s_75d7293523bbdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7833327-04a7-49da-90ef-76796eaf3993",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Darko Palic <darko.palic@xenovation.com>"
+    }
+  }
+}
