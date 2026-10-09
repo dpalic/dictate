@@ -66,17 +66,9 @@ can_read_input() {
 # which changes right away, while the running session needs a new login).
 ensure_input_group() {
     can_read_input && return 0
+    # In the group, but the session is older: the app itself says so (and what to do)
+    # when it fails to open the devices, right next to the fallback it switches to.
     if id -nG "$USER_NAME" | grep -qw input; then
-        cat >&2 <<EOF
-
-$USER_NAME is already in group 'input', but Linux applies group changes only to sessions
-started afterwards, and this session is older. So Dictate cannot read the input devices yet
-and uses a fallback: on X11 the hotkey still works, on Wayland it may not react outside
-Dictate's own window.
-
-Please log out and log in again (or reboot).
-
-EOF
         return 0
     fi
 
