@@ -4,7 +4,7 @@
 #   2. membership in group `input` (global hotkeys on Wayland)
 #   3. uv
 #   4. nvm, then Node lts/krypton (activated for the app)
-#   5. ./.venv with the libraries from requirements.txt
+#   5. Python 3.13 (from uv), then ./.venv with the libraries from requirements.txt
 #   6. the application-menu entry
 #
 #   ./run.sh           set up whatever is missing, then start the GUI
@@ -21,6 +21,7 @@ UV_VERSION=0.12.24
 NVM_VERSION=v0.40.3
 NODE_LTS=lts/krypton        # Node 24
 MIN_NODE_MAJOR=24
+PYTHON_SERIES=3.13          # installed by uv, newest 3.13.x at the first run, then kept
 VENV=.venv
 USER_NAME="${USER:-$(id -un)}"
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
@@ -149,9 +150,33 @@ ensure_node() {
     set -u
 }
 
+# Python for the venv comes from uv, not from the system: the same version on every
+# machine. The newest 3.13.x is installed once; after that it is kept. uv never
+# fetches or upgrades a Python on its own here (manual downloads only); to move on,
+# run `uv python upgrade` yourself and delete .venv.
+ensure_python() {
+    export UV_PYTHON_PREFERENCE=only-managed
+    export UV_PYTHON_DOWNLOADS=manual
+    if ! uv python find "$PYTHON_SERIES" >/dev/null 2>&1; then
+        echo "Installing Python $PYTHON_SERIES (the newest $PYTHON_SERIES.x, kept from now on) ..."
+        uv python install "$PYTHON_SERIES"
+    fi
+}
+
+venv_python_series() {
+    "$VENV/bin/python" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || true
+}
+
 ensure_python_libs() {
+    ensure_python
+    # A venv from an earlier run.sh used the system Python; rebuild it on the pinned series.
+    if [ -f "$VENV/pyvenv.cfg" ] && [ -x "$VENV/bin/python" ] &&
+        [ "$(venv_python_series)" != "$PYTHON_SERIES" ]; then
+        echo "Replacing $VENV (Python $(venv_python_series)) by one with Python $PYTHON_SERIES ..."
+        rm -rf "$VENV"
+    fi
     if [ ! -x "$VENV/bin/python" ]; then
-        uv venv --python /usr/bin/python3 "$VENV"
+        uv venv --clear --python "$PYTHON_SERIES" "$VENV"
     fi
     local missing=()
     mapfile -t missing < <("$VENV/bin/python" - requirements.txt <<'PY'
