@@ -5,6 +5,7 @@
 #   3. uv
 #   4. nvm, then Node lts/krypton (activated for the app)
 #   5. Python 3.13 (from uv), then ./.venv with the libraries from requirements.txt
+#      (versions are checked on every start and updated when they differ)
 #   6. the application-menu entry
 #
 #   ./run.sh           set up whatever is missing, then start the GUI
@@ -178,25 +179,18 @@ ensure_python_libs() {
     if [ ! -x "$VENV/bin/python" ]; then
         uv venv --clear --python "$PYTHON_SERIES" "$VENV"
     fi
-    local missing=()
-    mapfile -t missing < <("$VENV/bin/python" - requirements.txt <<'PY'
-import importlib.metadata as md
-import re
-import sys
-
-for line in open(sys.argv[1]):
-    req = line.split("#")[0].strip()
-    if not req:
-        continue
-    try:
-        md.version(re.split(r"[<>=!~\[; ]", req, maxsplit=1)[0])
-    except md.PackageNotFoundError:
-        print(req)
-PY
-)
-    if [ "${#missing[@]}" -gt 0 ]; then
-        echo "Installing missing Python libraries: ${missing[*]}"
-        uv pip install --python "$VENV/bin/python" "${missing[@]}"
+    # Preflight: compare the installed libraries with requirements.txt, versions included.
+    # A dry run changes nothing and needs no network when everything matches.
+    local plan
+    if ! plan="$(uv pip install --dry-run --python "$VENV/bin/python" -r requirements.txt 2>&1)"; then
+        echo "$plan" >&2
+        echo "The libraries in requirements.txt cannot be resolved (see above)." >&2
+        exit 1
+    fi
+    if ! grep -q "Would make no changes" <<<"$plan"; then
+        echo "The installed libraries differ from requirements.txt, updating:"
+        grep -E '^ [-+] ' <<<"$plan" || true
+        uv pip install --python "$VENV/bin/python" -r requirements.txt
     fi
 }
 
